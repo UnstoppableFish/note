@@ -1,4 +1,4 @@
-# AXI Master协议  
+# AXI 协议  
 ## 1、通道信号  
 写请求：携带地址和控制信号  
 AWVALID//主机  
@@ -194,6 +194,27 @@ function integer clogb2 (input integer bit_depth);
 	    end                                                           
 	  endfunction   
 ```
+# AXI DMA
+为外设和系统内存的直接数据访问提供桥梁，解放了CPU在内存读取方面的工作  
+## 接口
+![4.png](./figure/4.png "hello")
+AXI4 Stream Master (MM2S) MemoryMap to Stream  
+存储器映射（AXI-4 Full）到AXI-4 Stream  
+
+AXI4 Control Stream (MM2S) Stream to MemoryMap  
+AXI-4 Stream到存储器映射（AXI-4 Full） 
+## （简单DMA）Direct Register Mode配置顺序  
+通过访问DMACR，源地址或目的地址和长度寄存器发起传输。  
+启动顺序：  
+1.开始使能MM2S通道  
+2.使能中断  
+3.写有效源地址到MM2S_SA寄存器，如果没有使能DRE，则需要地址对齐 
+地址对齐是指为传输数据字节数的整数倍   
+4.写传输的字节数到MM2S_LENGTH寄存器  
+一个长度为0的值是无效的，非零值会决定寄存器映射到Stream的数据个数  
+必须最后一个配置MM2S_LENGTH寄存器，其他寄存器配置顺序没有要求  
+## IP核信号  
+![5.png](./figure/5.png)  
 
 
 
