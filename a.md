@@ -1,4 +1,4 @@
-# AXI协议  
+# AXI Master协议  
 ## 1、通道信号  
 写请求：携带地址和控制信号  
 AWVALID//主机  
@@ -172,6 +172,28 @@ BREADY持续拉高，BVALID在从机接收到完整数据后拉高，两者共�
 ## 6.读请求和读数据
 与写请求和写数据类似
 ![read](./figure/3.png)  
+## 7.注意
+在自己创建的AXI IP核中，默认突发长度为16，突发大小为32字节4Byte，每次突发64Byte，写计数器为七位，当最高位为1时停止写  
+所以一共写了64次，64*64 = 4KB  
+```
+reg [C_NO_BURSTS_REQ : 0] 	write_burst_counter;  
+
+if (M_AXI_BVALID && (write_burst_counter[C_NO_BURSTS_REQ]) && axi_bready)                          
+	      writes_done <= 1'b1;   
+
+parameter integer C_M_AXI_BURST_LEN	= 16,
+parameter integer C_M_AXI_DATA_WIDTH	= 32,
+localparam integer C_MASTER_LENGTH	= 12;   
+
+localparam integer C_NO_BURSTS_REQ = C_MASTER_LENGTH-clogb2((C_M_AXI_BURST_LEN*C_M_AXI_DATA_WIDTH/8)-1);  //12 - log2((16 * 32 / 8) - 1) = 6
+//求位宽函数
+function integer clogb2 (input integer bit_depth);              
+	  begin                                                           
+	    for(clogb2=0; bit_depth>0; clogb2=clogb2+1)                   
+	      bit_depth = bit_depth >> 1;                                 
+	    end                                                           
+	  endfunction   
+```
 
 
 
