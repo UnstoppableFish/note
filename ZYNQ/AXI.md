@@ -194,7 +194,22 @@ function integer clogb2 (input integer bit_depth);
 	      bit_depth = bit_depth >> 1;                                 
 	    end                                                           
 	  endfunction   
-```
+```  
+# AXI Stream Video 协议
+## 1.输入接口信号：  
+s_axis_video_tdata DATA  
+s_axis_video_tvalid VALID  
+s_axis_video_tready READY  
+s_axis_video_tuser SOF:Start Of Frame   
+s_axis_video_tlast EOL:End Of Line  
+输出接口信号与输入接口信号相似，为主接口：m_axis_video_tdata  
+## 2.TKEEP and TSTRB默认值为1  
+## 3.帧起始及握手信号  
+![7.png](./figure/7.png)  
+SOF在成功握手后拉低，表示第一个像素已发送  
+## 4.帧结束信号  
+![8.png](/figure/8.png)  
+在最后一个像素点拉高
 # AXI DMA
 为外设和系统内存的直接数据访问提供桥梁，解放了CPU在内存读取方面的工作  
 ## 接口
@@ -216,6 +231,10 @@ AXI-4 Stream到存储器映射（AXI-4 Full）
 必须最后一个配置MM2S_LENGTH寄存器，其他寄存器配置顺序没有要求  
 ## IP核信号  
 ![5.png](./figure/5.png)  
+## VDMA + VIDEO OUT + VTC + HDMI  
+![6.png](./figure/6.png)  
+
+
 
 
 
