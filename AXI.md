@@ -4,7 +4,8 @@
 AWVALID//主机  
 AWREADY//从机  
 AWADDR  
-AWLEN  
+AWLEN  //突发长度
+AWSIZE //突发大小，字节为单位，一次传输的数据量为AWLEN * AWSIZE（Byte）
 写数据：携带数据和控制信号  
 WVALID//主机  
 WREADY//从机  
