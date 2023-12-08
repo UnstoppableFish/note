@@ -209,7 +209,7 @@ s_axis_video_tlast EOL:End Of Line
 SOF在成功握手后拉低，表示第一个像素已发送  
 ## 4.帧结束信号  
 ![8.png](/figure/8.png)  
-在最后一个像素点拉高
+在一行的最后一个像素点拉高
 # AXI DMA
 为外设和系统内存的直接数据访问提供桥梁，解放了CPU在内存读取方面的工作  
 ## 接口
@@ -225,17 +225,69 @@ AXI-4 Stream到存储器映射（AXI-4 Full）
 1.开始使能MM2S通道  
 2.使能中断  
 3.写有效源地址到MM2S_SA寄存器，如果没有使能DRE，则需要地址对齐 
-地址对齐是指为传输数据字节数的整数倍   
+地址对齐是指：指定的传输地址必须为传输数据位宽的整数倍
 4.写传输的字节数到MM2S_LENGTH寄存器  
 一个长度为0的值是无效的，非零值会决定寄存器映射到Stream的数据个数  
 必须最后一个配置MM2S_LENGTH寄存器，其他寄存器配置顺序没有要求  
 ## IP核信号  
 ![5.png](./figure/5.png)  
-## VDMA + VIDEO OUT + VTC + HDMI  
+# VDMA + VIDEO OUT + VTC + HDMI  
 ![6.png](./figure/6.png)  
-
-
-
-
-
+## VDMA
+![9.png](./figure/9.png)  
+### 1、DDR读信号及时序  
+![Alt text](./figure/10.png)
+信号：   
+mm2s_fsync MM2S 帧同步输入  
+m_axis_mm2s_tlast ：行结束信号  
+mm2s_frame_ptr_out(5:0) : 读取 (MM2S) 通道帧指针输出。指示在读哪个帧缓存  
+mm2s_introut：内存映射至流通道的中断输出  
+m_*_t信号是AXI Stream信号，含义与AXI 相似  
+读取的数据通过行缓存转换成流数据  
+在这里，MM是指DDR，S指流向的目的地  
+MM2S为读 S2MM为写
+### 2、写信号
+![Alt text](./figure/11.png)  
+接收到 s2mm_fsync 后，AXI VDMA 驱动 s2mm_fsync_out 和 s_axis_s2mm_tready 以指示其已准备好在流接口上接收帧。  
+输入的流数据存储在行缓冲区中，而后写入DDR。
+## AXI4-Stream to Video Out
+需要和VTC一起使用
+![Alt text](./figure/12.png)  
+VTC支持两种模式：  
+主模式：  
+VTC自由运行
+从模式：  
+VTC 发生器时钟使能来控制 AXI4-Stream 输入和 VTC 之间的相位差，以实现低延迟应用。  
+一般建议使用从模式
+![Alt text](./figure/13.png)  
+### 1、信号列表
+vid_io_out_ce : 本地时钟启用，一般是输出端时钟，与AXI-Stream时钟相区别  
+fid : AXI4-Stream 总线的字段 ID。仅用于隔行扫描视频：0=偶数场，1=奇数场。默认悬空  
+vtg_ce:VTC 时钟使能。用于停止定时发生器以实现同步目的。  
+模块中：FIFO深度：当FIFO读空时会导致时序错误，所以一般设置较大的值（1024）
+## VTC
+VTC时序图  
+![Alt text](./figure/14.png)  
+行场同步信号都是正极性，当行场同步信号为负极性时，结果如下：  
+![15](./figure/15.png)  
+## 1、接口与模式
+![16](/figure/16.png)
+det_clken : VTC Detection有效时钟使能  
+gen_clken ：VTC Generator有效时钟使能
+fsync_in : FRAME SYNCHRONIZATION INPUT 帧同步输入  
+intc_if : OPTIONAL EXTERNAL INTERRUPT CONTROLLER INTERFACE 可选的外部中断控制器接口  
+## 2、配置  
+![Alt text](./figure/17.png)  
+Include AXI4-Lite Interface: 允许动态编程和更改处理显示参数。  
+Include INTC Interface：允许中断  
+Interlaced Video Support:选择后，启用隔行视频检测或生成  
+Synchronize Generator to Detector or to fsync_in:选择后，定时发生器会自动与检测器或 fsync_in 输入端口同步。  
+![Alt text](./figure/18.png)  
+Active Size:行有效宽度  
+Frame Size：行总数  
+Sync Start:行起始时间，按照VTC时序图中为有效宽度+前沿  
+Sync End：行结束，有效宽度+前沿+同步
+![Alt text](./figure/19.png)  
+场同步同理  
+Vblank Start = Vblank End = VSync Start = Vsync End = Active Size  
 
