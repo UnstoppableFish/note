@@ -208,7 +208,7 @@ s_axis_video_tlast EOL:End Of Line
 ![7.png](./figure/7.png)  
 SOF在成功握手后拉低，表示第一个像素已发送  
 ## 4.帧结束信号  
-![8.png](/figure/8.png)  
+![8.png](./figure/8.png)  
 在一行的最后一个像素点拉高
 # AXI DMA
 为外设和系统内存的直接数据访问提供桥梁，解放了CPU在内存读取方面的工作  
@@ -245,11 +245,47 @@ mm2s_introut：内存映射至流通道的中断输出
 m_*_t信号是AXI Stream信号，含义与AXI 相似  
 读取的数据通过行缓存转换成流数据  
 在这里，MM是指DDR，S指流向的目的地  
-MM2S为读 S2MM为写
+MM2S为读 S2MM为写  
+AXI VDMA 部分接口说明：
+S_AXI_LITE： AXI-Lite 接口， PS 通过这个接口配置 VDMA 的寄存器；  
+s_axi_lite_aclk： AXI VDMA AXI4-Lite 接口时钟；  
+M_AXI_MM2S：读通道存储器端映射的 AXI4 接口，提供对存储器（ DDR3）的访问；  
+m_axi_mm2s_aclk： AXI VDMA MM2S 时钟；  
+M_AXIS_MM2S：读通道 AXI-Stream 端映射的 AXI4 接口，用于输出到外设；  
+m_axis_mm2s_aclk： AXI VDMA MM2S AXIS 时钟；  
+mm2s_introut：读通道中断输出信号。  
 ### 2、写信号
 ![Alt text](./figure/11.png)  
 接收到 s2mm_fsync 后，AXI VDMA 驱动 s2mm_fsync_out 和 s_axis_s2mm_tready 以指示其已准备好在流接口上接收帧。  
 输入的流数据存储在行缓冲区中，而后写入DDR。
+### 3、启动流程  
+![Alt text](./figure/20.png)  
+以下以MM2S模式讲解，即从DDR读取模式  
+1.如果是MM2S模式，往偏移地址为0x00写入，将VDMARS.RS置1  
+如果要打开中断寄存器第13位拉高  
+打开RS第0位拉高  
+![Alt text](./figure/21.png)  
+2.往BaseAddr + 0x5c写入帧缓存的起始地址，即从DDR中读取的起始地址    
+3.写入行有效数据字节步长，指每条视频行的第一个像素之间的地址字节数。  
+![Alt text](./figure/22.png)  
+4.往base + 0x54写入行字节大小  
+5.往0x50写入列一共有多少行  
+```
+	//VDMA基地址
+	#define VDMA_BASE_ADDR XPAR_AXI_VDMA_0_BASEADDR
+	//DDR程序首地址
+	#define MEMORY_BASE	XPAR_PS7_DDR_0_S_AXI_BASEADDR
+	//写入图片缓存的DDR首地址，加上偏移量是为程序运行空间留内存  
+	unsigned int srcBuffer = (MEMORY_BASE  + 0x1000000);
+	//字节指针，指向DDR中内存
+	u8 * baseaddr = (u8 *)srcBuffer;
+
+	Xil_Out32(VDMA_BASE_ADDR,0x1);
+	Xil_Out32(VDMA_BASE_ADDR+0x5c,srcBuffer);
+	Xil_Out32(VDMA_BASE_ADDR+0x58,STRIDE * 3);
+	Xil_Out32(VDMA_BASE_ADDR+0x54,HPIXEL * 3);
+	Xil_Out32(VDMA_BASE_ADDR+0x50,VPIXEL);
+```
 ## AXI4-Stream to Video Out
 需要和VTC一起使用
 ![Alt text](./figure/12.png)  
