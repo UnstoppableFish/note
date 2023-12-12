@@ -279,12 +279,18 @@ mm2s_introut：读通道中断输出信号。
 	unsigned int srcBuffer = (MEMORY_BASE  + 0x1000000);
 	//字节指针，指向DDR中内存
 	u8 * baseaddr = (u8 *)srcBuffer;
-
+	//读通道
 	Xil_Out32(VDMA_BASE_ADDR,0x1);
 	Xil_Out32(VDMA_BASE_ADDR+0x5c,srcBuffer);
 	Xil_Out32(VDMA_BASE_ADDR+0x58,STRIDE * 3);
 	Xil_Out32(VDMA_BASE_ADDR+0x54,HPIXEL * 3);
 	Xil_Out32(VDMA_BASE_ADDR+0x50,VPIXEL);
+	//写通道
+	Xil_Out32(VDMA_BASE_ADDR+0x30,0x1);
+	Xil_Out32(VDMA_BASE_ADDR+0xAC,srcBuffer);
+	Xil_Out32(VDMA_BASE_ADDR+0xA8,STRIDE * 3)
+	Xil_Out32(VDMA_BASE_ADDR+0xA4,STRIDE * 3)
+	Xil_Out32(VDMA_BASE_ADDR+0xA0,VPIXEL)
 ```
 ## AXI4-Stream to Video Out
 需要和VTC一起使用
