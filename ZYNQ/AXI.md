@@ -332,4 +332,11 @@ Sync End：行结束，有效宽度+前沿+同步
 ![Alt text](./figure/19.png)  
 场同步同理  
 Vblank Start = Vblank End = VSync Start = Vsync End = Active Size  
+## HDMI配置
+### 720P
+![Alt text](./figure/23.png)
+### 1080P
+![Alt text](./figure/24.png)
+H_total = 2500
+V_total = 1120
 
