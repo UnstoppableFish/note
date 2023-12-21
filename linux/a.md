@@ -48,6 +48,7 @@ b = 123
 ## 函数
 ### foreach 遍历A中元素
 $(foreach var,list,text)
+for each var in list, change it to text  
 A = a b c  
 B = $(foreach f,$(A),$(f).o)  
 all :
@@ -85,3 +86,13 @@ a.d b.d c.d
 gcc -M a.c 打印出a.c的所有依赖文件
 gcc -M -MF c.d a.c 把依赖文件写入c.d中
 gcc -c -o c.o c.c -MD -MF .c.d 编译c.o，把依赖写入文件.c.d中
+### 常用参数
+make[-f file] [options] [target]  
+make 默认在当前目录中查找GUNmakefile、makefile 及 Makefile 文件作为make的输入文件  
+-f 指定文件作为输入文件  
+-v 显示版本号  
+-n 只输出命令不执行， 一般作为测试  
+-s 执行命令不显示命令，  
+-w 显示执行前和执行后的路径  
+-C dir 指定makefile 所在的目录  
+### 
