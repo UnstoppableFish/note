@@ -357,6 +357,162 @@ int main(){
     return 0;
 }
 ```
+# 驱动编程顺序  
+用户层和内核层的独立编程，可以使内核层的代码通用化，只需修改用户层即可改变驱动程序  
+## 1.用户层编程顺序  
+以LED为例  
+1.查找原理图，找到需要点亮的LED所在的GPIO位置，例GPIO5_3  
+2.找到手册中时钟使能模块对应的GPIO，例CCGR1[CG15](GPIO5_CLK_ENABLE)  
+说明CCGR1的CG15位控制GPIO5的时钟使能 0x020C406C   
+3.找到GPIO定义，配置IOMUX，例SNVS_TAMPER3为GPIO5_3的控制信号，模式为ALT5 0x02290014  
+4.配置GPIO5_GDIR方向寄存器，0x020AC004
+5.配置GPIO5_GD数据寄存器对应的位GPIO5_3对应该寄存器的第3位设0，0x020AC000  
+### 1.定义结构体及返回函数
+```
+#ifndef _LED_H
+#define _LED_H
+
+struct led_operations {
+    int num;//设备个数
+    int (*init) (int which);//初始化设备，which为副设备号
+    int (*ctl) (int which,char status);//控制设备状态
+    void (*exit)(void);
+};
+
+struct led_operations * get_led_opr(void);//函数，用于返回定义的led_operations结构体
+
+#endif // !_LED_H#define _LED_H
+```
+### 2.实例化结构体及返回函数
+```
+static struct led_operations stu_led = {
+    .num = 1,
+    .init = led_init,
+    .ctl = led_ctl,
+    .exit = led_exit
+} ;
+
+struct led_operations * get_led_opr(void){
+    return &stu_led;
+}
+```
+### 3.实现结构体中定义的函数
+```
+//定义指针用于保存映射后的地址
+static volatile int *clk_reg;
+static volatile int *mux_reg ;
+static volatile int *dr ;
+static volatile int *data ;
+
+int led_init (int which){
+    printk("%s %s",__FILE__,__FUNCTION__);
+    //将物理地址映射成虚拟地址
+    clk_reg = ioremap(0x020C406C,4);
+    mux_reg = ioremap(0x02290014,4);
+    dr = ioremap(0x020AC004,4);
+    data = ioremap(0x020AC000,4);
+    //配置时钟使能寄存器
+    *clk_reg &= ~(3 << 30);
+    *clk_reg |= (3 << 30);
+    //配置iomux寄存器
+    *mux_reg &= ~(0xf);
+    *mux_reg |= (0x5);
+    //配置方向寄存器
+    *dr |= (1 << 3); 
+    return 0;
+}
+
+int led_ctl (int which,char status){
+    printk("%s %s",__FILE__,__FUNCTION__);
+    if(status){
+        //配置数据寄存器
+        *data &= ~(1 << 3);
+    }
+    else{
+        *data |= (1 << 3);
+    }
+    return 0;
+}
+
+void led_exit(void){
+    //解除地址映射
+    iounmap(clk_reg);
+    iounmap(mux_reg);
+    iounmap(dr);
+    iounmap(data);
+}
+```
+## 2.设备底层编程顺序
+### 1.确定主设备号
+```
+static int major;//主设备号
+static struct class *led_class;//设备节点
+static struct led_operations *led_ptr;//分层中用户操作部分
+```
+### 2.定义自己的file_operations结构体
+```
+static struct file_operations led_drv = {
+    .owner = THIS_MODULE,
+    .open = led_open,
+    .write = led_write
+};
+```
+### 3.实现结构体中定义的函数
+```
+static int led_open (struct inode *node, struct file *file){
+    int num;
+    num = iminor(node);//从节点找到需要初始化的设备
+    led_ptr->init(num);
+    return 0;
+}
+
+static ssize_t led_write (struct file *file, const char __user *buf, size_t size, loff_t *offset){
+    int num;
+    int err;
+    char status;
+    struct inode *node;
+    node = file_inode(file);
+    num = iminor(node);
+    err = copy_from_user(&status,buf,1);//将测试程序中输入的数据传递给内核
+    led_ptr->ctl(num,status);//根据数据设置驱动状态
+    return 0;
+    
+}
+```
+### 4.定义注册入口函数
+```
+static int led_init(void){
+    int i;
+    int err;
+    major = register_chrdev(0,"myled",&led_drv);//注册
+    led_class = class_create(THIS_MODULE,"ledclass");//创建节点
+    led_ptr = get_led_opr();//获得用户定义的结构体
+    for(i = 0;i < led_ptr->num;i++){
+        device_create(led_class,NULL,MKDEV(major,i),NULL,"ledclass%d",i);//创建设备
+    }
+    return 0;
+}
+```
+### 5.定义出口函数
+```
+static void led_exit(void){
+    int i;
+    int err;
+    led_ptr->exit();//释放映射的空间
+    for(i = 0;i < led_ptr->num;i++){
+        device_destroy(led_class,MKDEV(major,i));
+    }
+    class_destroy(led_class);
+    unregister_chrdev(major,"myled");
+    
+}
+```
+### 6.提供设备信息，自动创建设备节点
+```
+module_init(led_init);
+module_exit(led_exit);
+MODULE_LICENSE("GPL");
+```
 
 
 
