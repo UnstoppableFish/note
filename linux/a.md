@@ -357,7 +357,7 @@ int main(){
     return 0;
 }
 ```
-# 驱动编程顺序  
+# 普通驱动编程顺序  
 用户层和内核层的独立编程，可以使内核层的代码通用化，只需修改用户层即可改变驱动程序  
 ## 1.用户层编程顺序  
 以LED为例  
@@ -513,6 +513,434 @@ module_init(led_init);
 module_exit(led_exit);
 MODULE_LICENSE("GPL");
 ```
+
+# 驱动总线编程方法  
+利用分离的思想  
+将程序分为设备和驱动两部分  
+## 设备端代码
+```
+led_device.c
+
+#include <linux/module.h>
+
+#include <linux/fs.h>
+#include <linux/errno.h>
+#include <linux/miscdevice.h>
+#include <linux/kernel.h>
+#include <linux/major.h>
+#include <linux/mutex.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#include <linux/stat.h>
+#include <linux/init.h>
+#include <linux/device.h>
+#include <linux/tty.h>
+#include <linux/kmod.h>
+#include <linux/gfp.h>
+#include <linux/platform_device.h>
+#include "led_resource.h"
+
+static void led_dev_release(struct device *dev)
+{
+}
+//定义资源列表
+static struct resource resources[] = {
+        {
+                .start = GROUP_PIN(3,1),
+                .flags = IORESOURCE_IRQ,
+                .name = "100ask_led_pin",
+        },
+		{
+				.start = GROUP_PIN(5,8),
+				.flags = IORESOURCE_IRQ,
+				.name = "100ask_led_pin",
+		},
+};
+
+//定义平台设备结构体
+static struct platform_device led_device = {
+		.name = "100ask_led",
+		.num_resources = ARRAY_SIZE(resources),
+		.resource = resources,
+		.dev = {
+				.release = led_dev_release,
+		 },
+};
+//设备初始化
+static int __init led_dev_init(void)
+{
+	int err;
+	
+	err = platform_device_register(&led_device);	
+	
+	return 0;
+}
+//设备退出
+static void __exit led_dev_exit(void)
+{
+	platform_device_unregister(&led_device);
+}
+
+module_init(led_dev_init);
+module_exit(led_dev_exit);
+
+MODULE_LICENSE("GPL");
+```
+## 驱动端代码
+```
+led_driver.c
+
+#include <linux/module.h>
+
+#include <linux/fs.h>
+#include <linux/errno.h>
+#include <linux/miscdevice.h>
+#include <linux/kernel.h>
+#include <linux/major.h>
+#include <linux/mutex.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#include <linux/stat.h>
+#include <linux/init.h>
+#include <linux/device.h>
+#include <linux/tty.h>
+#include <linux/kmod.h>
+#include <linux/gfp.h>
+#include <linux/platform_device.h>
+
+#include "led_opr.h"
+#include "leddrv.h"
+#include "led_resource.h"
+
+static int g_ledpins[100];
+static int g_ledcnt = 0;
+
+//led初始化，用于查找GPIO5的各个寄存器初始化
+static int board_demo_led_init (int which) /* 初始化LED, which-哪个LED */       
+{   
+    //printk("%s %s line %d, led %d\n", __FILE__, __FUNCTION__, __LINE__, which);
+    
+    printk("init gpio: group %d, pin %d\n", GROUP(g_ledpins[which]), PIN(g_ledpins[which]));
+    switch(GROUP(g_ledpins[which]))
+    {
+        case 0:
+        {
+            printk("init pin of group 0 ...\n");
+            break;
+        }
+        case 1:
+        {
+            printk("init pin of group 1 ...\n");
+            break;
+        }
+        case 2:
+        {
+            printk("init pin of group 2 ...\n");
+            break;
+        }
+        case 3:
+        {
+            printk("init pin of group 3 ...\n");
+            break;
+        }
+    }
+    
+    return 0;
+}
+
+//对单个GPIO5_3进行配置，控制亮灭
+static int board_demo_led_ctl (int which, char status) /* 控制LED, which-哪个LED, status:1-亮,0-灭 */
+{
+    //printk("%s %s line %d, led %d, %s\n", __FILE__, __FUNCTION__, __LINE__, which, status ? "on" : "off");
+    printk("set led %s: group %d, pin %d\n", status ? "on" : "off", GROUP(g_ledpins[which]), PIN(g_ledpins[which]));
+
+    switch(GROUP(g_ledpins[which]))
+    {
+        case 0:
+        {
+            printk("set pin of group 0 ...\n");
+            break;
+        }
+        case 1:
+        {
+            printk("set pin of group 1 ...\n");
+            break;
+        }
+        case 2:
+        {
+            printk("set pin of group 2 ...\n");
+            break;
+        }
+        case 3:
+        {
+            printk("set pin of group 3 ...\n");
+            break;
+        }
+    }
+
+    return 0;
+}
+//led控制结构体
+static struct led_operations board_demo_led_opr = {
+    .init = board_demo_led_init,
+    .ctl  = board_demo_led_ctl,
+};
+//返回led控制结构体
+struct led_operations *get_board_led_opr(void)
+{
+    return &board_demo_led_opr;
+}
+//驱动查找设备
+static int chip_demo_gpio_probe(struct platform_device *pdev)
+{
+    struct resource *res;
+    int i = 0;
+
+    while (1)
+    {
+        res = platform_get_resource(pdev, IORESOURCE_IRQ, i++);
+        if (!res)
+            break;
+        
+        g_ledpins[g_ledcnt] = res->start;
+        led_class_create_device(g_ledcnt);
+        g_ledcnt++;
+    }
+    return 0;
+    
+}
+//移除设备
+static int chip_demo_gpio_remove(struct platform_device *pdev)
+{
+    struct resource *res;
+    int i = 0;
+
+    while (1)
+    {
+        res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
+        if (!res)
+            break;
+        
+        led_class_destroy_device(i);
+        i++;
+        g_ledcnt--;
+    }
+    return 0;
+}
+
+//驱动结构体
+static struct platform_driver led_driver = {
+    .probe      = chip_demo_gpio_probe,
+    .remove     = chip_demo_gpio_remove,
+    .driver     = {
+        .name   = "100ask_led",
+    },
+};
+//驱动初始化
+static int __init chip_demo_gpio_drv_init(void)
+{
+    int err;
+    
+    err = platform_driver_register(&led_driver); 
+    register_led_operations(&board_demo_led_opr);
+    
+    return 0;
+}
+//驱动卸载
+static void __exit lchip_demo_gpio_drv_exit(void)
+{
+    platform_driver_unregister(&led_driver);
+}
+
+module_init(chip_demo_gpio_drv_init);
+module_exit(lchip_demo_gpio_drv_exit);
+
+MODULE_LICENSE("GPL");
+
+```
+
+## 通用模块 leddrv.v
+用于对led底层进行控制
+```
+#include <linux/module.h>
+
+#include <linux/fs.h>
+#include <linux/errno.h>
+#include <linux/miscdevice.h>
+#include <linux/kernel.h>
+#include <linux/major.h>
+#include <linux/mutex.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#include <linux/stat.h>
+#include <linux/init.h>
+#include <linux/device.h>
+#include <linux/tty.h>
+#include <linux/kmod.h>
+#include <linux/gfp.h>
+
+#include "led_opr.h"
+
+
+/* 1. 确定主设备号                                                                 */
+static int major = 0;
+static struct class *led_class;
+struct led_operations *p_led_opr;
+
+
+#define MIN(a, b) (a < b ? a : b)
+
+//这里把获得led控制结构体和创建/移除设备函数单独封装
+void led_class_create_device(int minor)
+{
+	device_create(led_class, NULL, MKDEV(major, minor), NULL, "100ask_led%d", minor); /* /dev/100ask_led0,1,... */
+}
+void led_class_destroy_device(int minor)
+{
+	device_destroy(led_class, MKDEV(major, minor));
+}
+void register_led_operations(struct led_operations *opr)
+{
+	p_led_opr = opr;
+}
+
+EXPORT_SYMBOL(led_class_create_device);
+EXPORT_SYMBOL(led_class_destroy_device);
+EXPORT_SYMBOL(register_led_operations);
+
+
+
+/* 3. 实现对应的open/read/write等函数，填入file_operations结构体                   */
+static ssize_t led_drv_read (struct file *file, char __user *buf, size_t size, loff_t *offset)
+{
+	printk("%s %s line %d\n", __FILE__, __FUNCTION__, __LINE__);
+	return 0;
+}
+
+/* write(fd, &val, 1); */
+static ssize_t led_drv_write (struct file *file, const char __user *buf, size_t size, loff_t *offset)
+{
+	int err;
+	char status;
+	struct inode *inode = file_inode(file);
+	int minor = iminor(inode);
+	
+	printk("%s %s line %d\n", __FILE__, __FUNCTION__, __LINE__);
+	err = copy_from_user(&status, buf, 1);
+
+	/* 根据次设备号和status控制LED */
+	p_led_opr->ctl(minor, status);
+	
+	return 1;
+}
+
+static int led_drv_open (struct inode *node, struct file *file)
+{
+	int minor = iminor(node);
+	
+	printk("%s %s line %d\n", __FILE__, __FUNCTION__, __LINE__);
+	/* 根据次设备号初始化LED */
+	p_led_opr->init(minor);
+	
+	return 0;
+}
+
+static int led_drv_close (struct inode *node, struct file *file)
+{
+	printk("%s %s line %d\n", __FILE__, __FUNCTION__, __LINE__);
+	return 0;
+}
+
+/* 2. 定义自己的file_operations结构体                                              */
+static struct file_operations led_drv = {
+	.owner	 = THIS_MODULE,
+	.open    = led_drv_open,
+	.read    = led_drv_read,
+	.write   = led_drv_write,
+	.release = led_drv_close,
+};
+
+/* 4. 把file_operations结构体告诉内核：注册驱动程序                                */
+/* 5. 谁来注册驱动程序啊？得有一个入口函数：安装驱动程序时，就会去调用这个入口函数 */
+static int __init led_init(void)
+{
+	int err;
+	
+	printk("%s %s line %d\n", __FILE__, __FUNCTION__, __LINE__);
+	major = register_chrdev(0, "100ask_led", &led_drv);  /* /dev/led */
+
+
+	led_class = class_create(THIS_MODULE, "100ask_led_class");
+	err = PTR_ERR(led_class);
+	if (IS_ERR(led_class)) {
+		printk("%s %s line %d\n", __FILE__, __FUNCTION__, __LINE__);
+		unregister_chrdev(major, "led");
+		return -1;
+	}
+	
+	return 0;
+}
+
+/* 6. 有入口函数就应该有出口函数：卸载驱动程序时，就会去调用这个出口函数           */
+static void __exit led_exit(void)
+{
+	printk("%s %s line %d\n", __FILE__, __FUNCTION__, __LINE__);
+
+	class_destroy(led_class);
+	unregister_chrdev(major, "100ask_led");
+}
+
+
+/* 7. 其他完善：提供设备信息，自动创建设备节点                                     */
+
+module_init(led_init);
+module_exit(led_exit);
+
+MODULE_LICENSE("GPL");
+
+```
+## 其他.h文件
+```
+#ifndef _LED_OPR_H
+#define _LED_OPR_H
+
+struct led_operations {
+	int (*init) (int which); /* 初始化LED, which-哪个LED */       
+	int (*ctl) (int which, char status); /* 控制LED, which-哪个LED, status:1-亮,0-灭 */
+};
+
+struct led_operations *get_board_led_opr(void);
+
+
+#endif
+
+#ifndef _LED_RESOURCE_H
+#define _LED_RESOURCE_H
+
+/* GPIO3_0 */
+/* bit[31:16] = group */
+/* bit[15:0]  = which pin */
+#define GROUP(x) (x>>16)
+#define PIN(x)   (x&0xFFFF)
+#define GROUP_PIN(g,p) ((g<<16) | (p))
+
+
+#endif
+
+#ifndef _LEDDRV_H
+#define _LEDDRV_H
+
+#include "led_opr.h"
+
+void led_class_create_device(int minor);
+void led_class_destroy_device(int minor);
+void register_led_operations(struct led_operations *opr);
+
+#endif /* _LEDDRV_H */
+```
+# 设备树DTS  
+与总线差不多，区别在于需要将设备写入设备树中  
+通过compatible将驱动与设备联系起来  
 
 
 
