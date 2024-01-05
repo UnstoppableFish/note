@@ -941,6 +941,6 @@ void register_led_operations(struct led_operations *opr);
 # 设备树DTS  
 与总线差不多，区别在于需要将设备写入设备树中  
 通过compatible将驱动与设备联系起来  
-
+ 
 
 
