@@ -1,0 +1,13 @@
+#-----------------------------------------------------------
+# Vivado v2022.1 (64-bit)
+# SW Build 3526262 on Mon Apr 18 15:48:16 MDT 2022
+# IP Build 3524634 on Mon Apr 18 20:55:01 MDT 2022
+# Start of session at: Thu Apr 25 10:48:58 2024
+# Process ID: 3300
+# Current directory: F:/a_xilinx/note/code/verilog/sim/project_1/project_1.runs/synth_1
+# Command line: vivado.exe -log add.vds -product Vivado -mode batch -messageDb vivado.pb -notrace -source add.tcl
+# Log file: F:/a_xilinx/note/code/verilog/sim/project_1/project_1.runs/synth_1/add.vds
+# Journal file: F:/a_xilinx/note/code/verilog/sim/project_1/project_1.runs/synth_1\vivado.jou
+# Running On: DESKTOP-SA68PGK, OS: Windows, CPU Frequency: 2918 MHz, CPU Physical cores: 14, Host memory: 34066 MB
+#-----------------------------------------------------------
+source add.tcl -notrace

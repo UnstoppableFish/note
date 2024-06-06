@@ -1,0 +1,72 @@
+`timescale 1ns/1ns
+
+module add_half(
+   input                A   ,
+   input                B   ,
+ 
+   output	wire        S   ,
+   output   wire        C   
+);
+
+assign S = A ^ B;
+assign C = A & B;
+endmodule
+
+/***************************************************************/
+module add_full(
+   input                A   ,
+   input                B   ,
+   input                Ci  , 
+
+   output	wire        S   ,
+   output   wire        Co   
+);
+
+wire	sum1;
+wire	co1;
+wire	co2;
+
+add_half add1(
+   .A (A) ,
+   .B (B) ,
+ 
+   .S (sum1) ,
+   .C (co1) 
+);
+
+add_half add2(
+   .A (Ci) ,
+   .B (sum1) ,
+ 
+   .S (S) ,
+   .C (co2) 
+);
+
+assign Co = co1 | co2;
+endmodule
+
+`timescale 1ns/1ns
+
+module add_4(
+   input         [3:0]  A   ,
+   input         [3:0]  B   ,
+   input                Ci  , 
+
+   output	wire [3:0]  S   ,
+   output   wire        Co   
+);
+
+wire	[3:0]	ct;
+
+add_full add0(.A  (A[0]),.B  (B[0]),.Ci (Ci), .S  (S[0]),.Co (ct[0]) );
+
+genvar i;
+generate
+	for(i = 1;i < 4;i = i + 1)begin
+		add_full add(.A  (A[i]),.B  (B[i]),.Ci (ct[i - 1]), .S  (S[i]),.Co (ct[i]) );
+	end
+endgenerate
+
+assign	Co = ct[3];
+
+endmodule
